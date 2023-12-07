@@ -83,9 +83,14 @@ uint8_t u8, u8Temp[4];
        u8Temp[0] = 0x82; // LED control register
        u8Temp[1] = u8;
     } else { // APDS-99xx
-       u8 = (3-boost)<<6; // PDRIVE 0=100mA, 1=50mA, 2=25mA, 3=12.5mA
-       u8 |= 0x20; // reserved PDIODE value of 10 = Ch1
-       u8 |= 0x00; // 1X gain for proximity, 1X gain for ALS
+	if (_iType == BBP_TYPE_APDS9930) {
+       		u8 = (3-boost)<<6; // PDRIVE 0=100mA, 1=50mA, 2=25mA, 3=12.5mA
+       		u8 |= 0x20; // reserved PDIODE value of 10 = Ch1
+       		u8 |= 0x00; // 1X gain for proximity, 1X gain for ALS
+	} else { // APDS9960
+		u8 = (3-boost)<<6; // PDRIVE 0=100ma, 1=50mA, 2=25mA, 3=12.5mA
+		u8 |= 0x3; // proximity gain = 8x, ALS Gain = 1x
+	}
        u8Temp[0] = 0x8f; // control register
        u8Temp[1] = u8;
     }
@@ -116,17 +121,24 @@ uint8_t u8, u8Temp[4];
         u8Temp[0] = 0x80; // control reg
         u8Temp[1] = u8;
         I2CWrite(_iAddr, u8Temp, 2);
-        u8Temp[0] = 0xA1; // ATIME, PTIME, WTIME
-        u8Temp[1] = 0xff; // min ALS integration time
-        u8Temp[2] = 0xff; // min prox integration time
-        u8Temp[3] = 0xff; // min wait time
-        I2CWrite(_iAddr, u8Temp, 4);
-        u8Temp[0] = 0x8e; 
-        u8Temp[1] = 8; // min prox pulse count = 8
-        I2CWrite(_iAddr, u8Temp, 2);
-	u8Temp[0] = 0x8f;
-        u8Temp[1] = 0x2d; // 100mA PDRIVE, Ch1 diode, PGAIN = 8x, AGAIN = 8x
-        I2CWrite(_iAddr, u8Temp, 2);
+	if (_iType == BBP_TYPE_APDS9930) {
+        	u8Temp[0] = 0xA1; // ATIME, PTIME, WTIME
+        	u8Temp[1] = 0xdf; // ALS integration time (0x100 - x) * 2.7ms
+        	u8Temp[2] = 0xdf; // min prox integration time
+        	u8Temp[3] = 0xdf; // min wait time
+        	I2CWrite(_iAddr, u8Temp, 4);
+        	u8Temp[0] = 0x8e; 
+        	u8Temp[1] = 8; // min prox pulse count = 8
+        	I2CWrite(_iAddr, u8Temp, 2);
+		u8Temp[0] = 0x8f;
+        	u8Temp[1] = 0x2d; // 100mA PDRIVE, Ch1 diode, PGAIN = 8x, AGAIN = 8x
+        	I2CWrite(_iAddr, u8Temp, 2);
+	} else { // APDS9960
+
+		u8Temp[0] = 0x8e; // prox pulse count and width
+		u8Temp[1] = 0xc8; // 32us pw, count=8
+		I2CWrite(_iAddr, u8Temp, 2);
+	}
     }
 } /* bbp_start() */
 
@@ -173,7 +185,7 @@ int iDist = 0;
                 iDist = u8Temp[0] + (u8Temp[1]<<8);
             } else { // APDS-9960
                 I2CReadRegister(_iAddr, 0x9c, u8Temp, 1);
-                iDist = u8Temp[0];
+                iDist = u8Temp[0] << 8;
             }
         }
     }
